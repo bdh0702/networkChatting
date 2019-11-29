@@ -1,0 +1,4 @@
+hello:안녕하세요
+read:읽다
+write:쓰다
+study:공부
