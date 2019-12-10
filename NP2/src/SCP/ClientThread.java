@@ -4,6 +4,10 @@ package SCP;
 import java.io.*;
 import java.util.*;
 import java.net.*;
+import javax.swing.*;
+import javax.swing.event.*;
+import javax.swing.border.*;
+
 
 public class ClientThread extends Thread
 {
@@ -15,10 +19,10 @@ public class ClientThread extends Thread
    private StringBuffer ct_buffer; // 버퍼
    private Thread thisThread;
    private DisplayRoom room;
-
+   String msg;
    private static final String SEPARATOR = "|";
    private static final String DELIMETER = "`";
-
+   private static final int PORT = 3777;
    // 메시지 패킷 코드 및 데이터 정의
 
    // 서버에 전송하는 메시지 코드
@@ -27,7 +31,8 @@ public class ClientThread extends Thread
    private static final int REQ_SENDWORDS = 1021;
    private static final int REQ_LOGOUT = 1031;
    private static final int REQ_QUITROOM = 1041;
-
+   private static final int REQ_WHISPER = 1042;
+   private static final int REQ_SENDFILE = 1043;
    // 서버로부터 전송되는 메시지 코드
    private static final int YES_LOGON = 2001;
    private static final int NO_LOGON = 2002;
@@ -40,14 +45,18 @@ public class ClientThread extends Thread
    private static final int YES_LOGOUT = 2031;
    private static final int NO_LOGOUT = 2032;
    private static final int YES_QUITROOM = 2041;
+   private static final int YES_WHISPER = 2042;
+   private static final int NO_SENDFILE = 2043;
+   private static final int YES_SENDFILE = 2044;
 
    // 에러 메시지 코드
    private static final int MSG_ALREADYUSER = 3001;
    private static final int MSG_SERVERFULL = 3002;
    private static final int MSG_CANNOTOPEN = 3011;
 
-   private static MessageBox msgBox, logonbox;
-
+   private static final int ERR_REJECTION = 3012;
+   private static MessageBox msgBox, logonbox,fileTransBox;
+   //private static MessageBox_File fileTransBox;
    /* 원격호스트와 연결을 위한 생성자
           실행 : java ChatClient 호스트이름 포트번호 
    	  To DO .....				*/
@@ -75,6 +84,7 @@ public class ClientThread extends Thread
          while(currThread == thisThread){ // 종료는 LOG_OFF에서 thisThread=null;에 의하여
             String recvData = ct_in.readUTF();
             StringTokenizer st = new StringTokenizer(recvData, SEPARATOR);
+                  
             int command = Integer.parseInt(st.nextToken());
             switch(command){
 
@@ -101,6 +111,7 @@ public class ClientThread extends Thread
                      logonbox.dispose();
                      msgBox = new MessageBox(ct_client, "로그온", "이미 다른 사용자가 있습니다.");
                      msgBox.show();
+                     ct_client.msg_logon="";
                   }else if(errcode == MSG_SERVERFULL){
                      logonbox.dispose();
                      msgBox = new MessageBox(ct_client, "로그온", "대화방이 만원입니다.");
@@ -108,6 +119,7 @@ public class ClientThread extends Thread
                   }
                   break;
                }
+               
 
                // 대화방 개설 및 입장 성공 메시지  PACKET : YES_ENTERROOM|ID
                case YES_ENTERROOM:{
@@ -125,6 +137,7 @@ public class ClientThread extends Thread
                   if(roomerrcode == MSG_CANNOTOPEN){
                      msgBox = new MessageBox(ct_client, "대화방입장", "로그온된 사용자가 아닙니다.");
                      msgBox.show();
+                     ct_client.msg_logon="";
                   }   
                   break;
                }
@@ -138,6 +151,59 @@ public class ClientThread extends Thread
                    while(users.hasMoreTokens()){
                       ct_client.cc_lstMember.add(users.nextToken());
                    }
+            	   break;
+               }
+               
+               case REQ_SENDFILE : {
+            	   String id = st.nextToken(); //보낸 사람 아이디
+            	   String message = id +"로 부터 파일전송을 수락하시겠습니까?";
+            	   int value = JOptionPane.showConfirmDialog(room, message,"파일수신",JOptionPane.YES_NO_OPTION);
+            	   if(value == 1) { //거절 누를시
+            		   //나의 아이디 + 보냈던 사람 id 
+            		   try {
+            			   ct_buffer.setLength(0);
+            			   ct_buffer.append(NO_SENDFILE);
+            			   ct_buffer.append(SEPARATOR);
+            			   ct_buffer.append(ct_client.msg_logon);
+            			   ct_buffer.append(SEPARATOR);
+            			   ct_buffer.append(id);
+            			   
+            			   send(ct_buffer.toString());
+            		   }catch(IOException e) {
+            			   System.out.println(e);
+            		   }
+            			   
+            		   
+            	   }else {//요청 수락 시
+            		   StringTokenizer addr = new StringTokenizer(InetAddress.getLocalHost().toString(),"/");
+            		   //호스트의 포트번호를 보내기 위해서 로컬주소/포트번호 를 나누려고함
+            		   String hostname = "";
+            		   String hostaddr = "";
+            		   
+            		   hostname=addr.nextToken();
+            		   try {
+            			   hostaddr=addr.nextToken();
+            		   }catch(NoSuchElementException err) {
+            			   hostaddr = hostname;
+            		   }
+            		   try {
+            			   ct_buffer.setLength(0);
+            			   ct_buffer.append(YES_SENDFILE);
+            			   ct_buffer.append(SEPARATOR);
+            			   ct_buffer.append(ct_client.msg_logon); //나의 아이디 + 상대방 요청보냈던 id +포트번호를 보냄
+            			   ct_buffer.append(SEPARATOR);
+            			   ct_buffer.append(id);
+            			   ct_buffer.append(SEPARATOR);
+            			   ct_buffer.append(hostaddr);
+            			   ct_buffer.append(SEPARATOR);
+            			   ct_buffer.append(PORT);
+            			   send(ct_buffer.toString());
+            		   }catch(IOException e) {
+            			   System.out.println(e);
+            		   }
+            		   //파일 수신 서버 실행
+            		   new ReceiveFile();
+            	   }
             	   break;
                }
                
@@ -165,7 +231,10 @@ public class ClientThread extends Thread
                // LOGOUT 메시지 처리 
                // PACKET : YES_LOGOUT|탈퇴자id|탈퇴자 제외 id1, id2,....
                case YES_LOGOUT:{
-
+            	  String str = st.nextToken();
+            	  ct_client.cc_lstMember.clear();
+            	  ct_client.cc_tfLogon.setEditable(true);
+            	  ct_client.msg_logon="";
                   break;
                }
 
@@ -174,6 +243,35 @@ public class ClientThread extends Thread
             	  String id = st.nextToken();
             	  //room.dr_lstMember.remove(id);
                   break;
+               }
+               
+               case YES_WHISPER:{           
+            	   String sender = st.nextToken();
+            	   String receiver= st.nextToken();
+            	   String msg = st.nextToken();
+            	   room.dr_taContents.append(sender +" -> " +receiver +": "+ msg +"\r\n");
+            	   break;
+               }
+               case NO_SENDFILE : {
+            	   int code = Integer.parseInt(st.nextToken());
+            	   String id = st.nextToken();
+            	   fileTransBox.dispose();
+            	   
+            	   if(code==ERR_REJECTION) {
+            		   String message =id+"님이 파일수신을 거부하였습니다.";
+            		   JOptionPane.showMessageDialog(room, message,"파일전송",JOptionPane.ERROR_MESSAGE);;
+            		   break;
+            	   }
+               }
+               case YES_SENDFILE:{
+            	   String id = st.nextToken();
+            	   String addr = st.nextToken();
+            	   String port = st.nextToken();
+            	   //System.out.println(addr);
+            	   
+            	   fileTransBox.dispose();
+            	   new SendFile(addr,port);
+            	   break;
                }
 
             } // switch 종료
@@ -250,7 +348,53 @@ public class ClientThread extends Thread
          System.out.println(e);
       }
    }
+   
+   public void requestLogout(String id) {
+	      try{
+	         ct_buffer.setLength(0);   
+	         ct_buffer.append(REQ_LOGOUT);
+	         ct_buffer.append(SEPARATOR);
+	         ct_buffer.append(id);
+	         ct_buffer.append(SEPARATOR);
+	         send(ct_buffer.toString());   
+	      }catch(IOException e){
+	         System.out.println(e);
+	      }
+	}
+   
+   public void requestwhisper(String receiver,String msg) {   //    메세지 / 보내는 아이디  / 받을 아이디 / 메세지
+	      try{
+	         ct_buffer.setLength(0);   
+	         ct_buffer.append(REQ_WHISPER);
+	         ct_buffer.append(SEPARATOR);
+	         ct_buffer.append(ct_client.msg_logon); //보내는 사람
+	         ct_buffer.append(SEPARATOR);
+	         ct_buffer.append(receiver); //받는사람
+	         ct_buffer.append(SEPARATOR);
+	         ct_buffer.append(msg); //메세지
+	         ct_buffer.append(SEPARATOR);
+	         send(ct_buffer.toString());   
+	      }catch(IOException e){
+	         System.out.println(e);
+	      }
+	}
 
+   public void requestSendFile(String receive_ID) {   //요청하는 아이디 // 받는아이디를 서버에 보냄
+	   fileTransBox = new MessageBox(room,"파일전송","상대방의 승인을 기다립니다");
+	   fileTransBox.show();
+	   try {
+		   ct_buffer.setLength(0);
+		   ct_buffer.append(REQ_SENDFILE);
+		   ct_buffer.append(SEPARATOR);
+		   ct_buffer.append(ct_client.msg_logon);
+		   ct_buffer.append(SEPARATOR);
+		   ct_buffer.append(receive_ID);
+		   send(ct_buffer.toString());		   
+	   }catch(IOException e) {
+		   System.out.println(e);
+	   }
+	   
+   }
    // 클라이언트에서 메시지를 전송한다.
    private void send(String sendData) throws IOException {
       ct_out.writeUTF(sendData);

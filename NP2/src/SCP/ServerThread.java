@@ -34,8 +34,8 @@ public class ServerThread extends Thread
    private static final int REQ_SENDWORDS = 1021;
    private static final int REQ_LOGOUT = 1031;
    private static final int REQ_QUITROOM = 1041;
-
-
+   private static final int REQ_WHISPER = 1042;
+   private static final int REQ_SENDFILE = 1043;
    // 클라이언트에 전송하는 메시지 코드
    private static final int YES_LOGON = 2001;
    private static final int NO_LOGON = 2002;
@@ -48,13 +48,16 @@ public class ServerThread extends Thread
    private static final int YES_LOGOUT = 2031;
    private static final int NO_LOGOUT = 2032;
    private static final int YES_QUITROOM = 2041;
-
+   private static final int YES_WHISPER = 2042;
+   private static final int NO_SENDFILE = 2043;
+   private static final int YES_SENDFILE = 2044;
 
    // 에러 메시지 코드
    private static final int MSG_ALREADYUSER = 3001;
    private static final int MSG_SERVERFULL = 3002;
    private static final int MSG_CANNOTOPEN = 3011;
 
+   private static final int ERR_REJECTION = 3012;
 
    static{	
       logonHash = new Hashtable<String,ServerThread>(ChatServer.cs_maxclient);
@@ -171,10 +174,80 @@ public class ServerThread extends Thread
                }
 
                // LOGOUT 전송 시도 메시지  
-               // PACKET : YES_LOGOUT|탈퇴자ID|탈퇴자 이외의 ids
+               // PACKET : YES_LOGOUT|탈퇴자ID
                case REQ_LOGOUT:{
-
+            	  String id = st.nextToken();
+            	  logonVector.remove(id);
+            	  logonHash.remove(id);
+            	  if(roomVector.contains(id)) {
+            		  roomVector.remove(id);
+                	  roomHash.remove(id);
+                	  
+                	  st_buffer.setLength(0);
+                	  st_buffer.append(MDY_ROOMUSERIDS);
+                      st_buffer.append(SEPARATOR);
+                      String roomIDs = getRoomUsers(); // 대화방 참여 사용자 ID를 구한다
+                      st_buffer.append(roomIDs);
+                      st_buffer.append(SEPARATOR);
+                      broadcast(st_buffer.toString());
+            	  }         	  
+            	
+            	  st_buffer.setLength(0);
+            	  st_buffer.append(MDY_USERIDS);
+                  st_buffer.append(SEPARATOR);
+                  String userIDs = getUsers(); // 대화방 참여 사용자 ID를 구한다
+                  st_buffer.append(userIDs);
+                  st_buffer.append(SEPARATOR);
+                  user_broadcast(st_buffer.toString());
+                  
+            	  st_buffer.setLength(0);
+            	  st_buffer.append(YES_LOGOUT);
+            	  st_buffer.append(SEPARATOR);
+            	  st_buffer.append(id);
+            	  st_buffer.append(SEPARATOR);
+            	  send(st_buffer.toString());
+            	  
+            	  
+                            	  
                   break;
+               } 
+               case REQ_SENDFILE :{
+            	   String send_id = st.nextToken();
+            	   String receive_id = st.nextToken();
+            	   //System.out.println("send_id ="+send_id);
+            	   //System.out.println("receive_id ="+receive_id);
+            	   st_buffer.setLength(0);
+            	   st_buffer.append(REQ_SENDFILE);
+            	   st_buffer.append(SEPARATOR);
+            	   st_buffer.append(send_id);
+            	   st_buffer.append(SEPARATOR);
+            	   ServerThread client;
+            	   client=(ServerThread)roomHash.get(receive_id);
+            	   client.send(st_buffer.toString());
+            	   break;
+            	               	   
+               }
+               //보내는 사람 + 받는사람 + 메세지 
+               case REQ_WHISPER :{ 
+            	   String sender = st.nextToken();
+            	   String receiver = st.nextToken();
+            	   String msg = st.nextToken();
+            	   
+            	   st_buffer.setLength(0);
+            	   st_buffer.append(YES_WHISPER);
+            	   st_buffer.append(SEPARATOR);
+            	   st_buffer.append(sender);
+            	   st_buffer.append(SEPARATOR);
+            	   st_buffer.append(receiver);
+            	   st_buffer.append(SEPARATOR);
+            	   st_buffer.append(msg);
+            	   st_buffer.append(SEPARATOR);
+            	   
+            	   
+            	   ServerThread client;
+            	   client=(ServerThread)roomHash.get(receiver);
+            	   client.send(st_buffer.toString());
+            	   break;
                }
 
                // 방 입장전의 LOGOUT 전송 시도 메시지 PACKET : YES_QUITROOM
@@ -198,6 +271,49 @@ public class ServerThread extends Thread
                   broadcast(st_buffer.toString());
      	  
                   break;
+               }
+               case NO_SENDFILE :{//요청보냈던 상대 id + 요청 보낸 사람 id 전송됌
+            	   String id= st.nextToken();//요청 보냈던 상대id
+            	   String idTo = st.nextToken();
+            	   
+            	   ServerThread client;
+            	   client=(ServerThread)roomHash.get(idTo);
+            	   
+            	   st_buffer.setLength(0); //요청 거절메세지 + 수락거부메세지 + 요청보냈던 사람 id를 보냄
+            	   st_buffer.append(NO_SENDFILE);
+            	   st_buffer.append(SEPARATOR);
+            	   st_buffer.append(ERR_REJECTION);
+            	   st_buffer.append(SEPARATOR);
+            	   st_buffer.append(id);
+            	   
+            	   client.send(st_buffer.toString());
+            	   break;
+            	   
+               }
+               
+               case YES_SENDFILE :{//상대방 아이디 + 나의 id +포트번호를 받음  //보냈던 사람이 수락이니깐 포트번호를 알려줘서 연결할수 있게 해줌
+            	   String id = st.nextToken();
+            	   String idTo = st.nextToken();
+            	   String hostaddr = st.nextToken();
+            	   String port = st.nextToken();
+            	   
+            	   ServerThread client;
+            	   client=(ServerThread)roomHash.get(idTo);
+            	   
+            	   st_buffer.setLength(0);
+            	   st_buffer.append(YES_SENDFILE);
+            	   st_buffer.append(SEPARATOR);
+            	   st_buffer.append(id);
+            	   st_buffer.append(SEPARATOR);
+            	   st_buffer.append(hostaddr);
+            	   st_buffer.append(SEPARATOR);
+            	   st_buffer.append(port);
+            	   
+            	   client.send(st_buffer.toString());
+            	   break;
+            	   
+            	   
+            	   
                }
 
             } // switch 종료

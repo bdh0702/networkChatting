@@ -3,8 +3,11 @@ package SCP;
 
 import java.awt.*;
 import java.awt.event.*;
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.InetAddress;
 
-public class ChatClient extends Frame implements ActionListener
+public class ChatClient extends Frame implements ActionListener,KeyListener
 {
    
    public TextField cc_tfLogon; // 로그온 입력 텍스트 필드
@@ -32,6 +35,7 @@ public class ChatClient extends Frame implements ActionListener
       bt_panel.add(cc_btLogon);
       
       cc_tfLogon = new TextField(10);
+      cc_tfLogon.addKeyListener(this);
       bt_panel.add(cc_tfLogon);
       
       cc_btEnter = new Button("대화방입장");
@@ -80,8 +84,15 @@ public class ChatClient extends Frame implements ActionListener
    class WinListener extends WindowAdapter
    {
       public void windowClosing(WindowEvent we){
-
-         System.exit(0); // 나중에 로그아웃루틴으로 변경
+    	  if(!msg_logon.equals("")) {
+    		  cc_thread.requestLogout(msg_logon);
+    	      System.exit(0); // 나중에 로그아웃루틴으로 변경
+    	  }
+    	  else {
+    		  System.exit(0); // 나중에 로그아웃루틴으로 변경
+    	  }
+    	 //cc_thread.requestLogout(msg_logon);
+        
       }
    }
 
@@ -89,19 +100,29 @@ public class ChatClient extends Frame implements ActionListener
    public void actionPerformed(ActionEvent ae){
       Button b = (Button)ae.getSource();
       if(b.getLabel().equals("로그온실행")){
-
          // 로그온 처리 루틴
-         msg_logon = cc_tfLogon.getText(); // 로그온 ID를 읽는다.
-         if(!msg_logon.equals("")){
-            cc_thread.requestLogon(msg_logon); // ClientThread의 메소드를 호출
-         }else{
-            MessageBox msgBox = new  MessageBox(this, "로그온", "로그온 id를 입력하세요.");
-            msgBox.show();
-         }
+    	 if(!msg_logon.equals("")) {
+    		 MessageBox msgBox = new MessageBox(this, "로그온 되어있습니다", "이미 로그인 되어있습니다");
+             msgBox.show();
+    	 }else {
+    		 msg_logon = cc_tfLogon.getText(); // 로그온 ID를 읽는다.
+             if(!msg_logon.equals("")){
+                cc_thread.requestLogon(msg_logon); // ClientThread의 메소드를 호출
+             }else{
+                MessageBox msgBox = new  MessageBox(this, "로그온", "로그온 id를 입력하세요.");
+                msgBox.show();
+             }
+    	 }
+         
       }else if(b.getLabel().equals("대화방입장")){
 
          // 대화방 개설 및 입장 처리 루틴
-         msg_logon = cc_tfLogon.getText(); // 로그온 ID를 읽는다.
+    	  if(cc_tfLogon.isEditable()) {
+    		  msg_logon="";
+    	  }else {
+    		  msg_logon = cc_tfLogon.getText();
+    	  }
+         //msg_logon = cc_tfLogon.getText(); // 로그온 ID를 읽는다.
          if(!msg_logon.equals("")){
             cc_thread.requestEnterRoom(msg_logon); // ClientThread의 메소드를 호출
          }else{
@@ -110,9 +131,14 @@ public class ChatClient extends Frame implements ActionListener
          }
 
       }else if(b.getLabel().equals("로그아웃")){
-
+    	  if(msg_logon.equals("")) {
+    		  MessageBox msgBox = new MessageBox(this, "로그온", "로그온을 먼저 하십시오.");
+    	  }
+    	  else {
+    		  cc_thread.requestLogout(msg_logon);
+    	  }
+    	 
       // 로그아웃 처리 루틴
-
       }
    }
 
@@ -135,5 +161,29 @@ public class ChatClient extends Frame implements ActionListener
       }catch(Exception e){
          System.out.println(e);
       }
+   }
+   
+   public void keyPressed(KeyEvent ke) {
+	      if(ke.getKeyChar() == KeyEvent.VK_ENTER) {
+	    	  msg_logon = cc_tfLogon.getText(); // 로그온 ID를 읽는다.
+	          if(!msg_logon.equals("")){
+	             cc_thread.requestLogon(msg_logon); // ClientThread의 메소드를 호출
+	          }else{
+	             MessageBox msgBox = new  MessageBox(this, "로그온", "로그온 id를 입력하세요.");
+	             msgBox.show();
+	          }
+	      }
+	   }
+
+   @Override
+   public void keyReleased(KeyEvent arg0) {
+	// TODO Auto-generated method stub
+	
+   }
+
+   @Override
+   public void keyTyped(KeyEvent arg0) {
+	// TODO Auto-generated method stub
+	
    }
 }
