@@ -9,7 +9,9 @@ import java.net.InetAddress;
 
 public class ChatClient extends Frame implements ActionListener,KeyListener
 {
-   
+   public Button cc_enterRoom;
+   public Button cc_makeRoom;
+   public List cc_lstRoom;
    public TextField cc_tfLogon; // 로그온 입력 텍스트 필드
    private Button cc_btLogon; // 로그온 실행 버튼
    private Button cc_btEnter; // 대화방 개설 및 입장 버튼
@@ -45,7 +47,18 @@ public class ChatClient extends Frame implements ActionListener,KeyListener
       cc_btLogout = new Button("로그아웃");
       cc_btLogout.addActionListener(this);
       bt_panel.add(cc_btLogout);
-      add("Center", bt_panel);
+      
+      add("Center",bt_panel);
+      Panel panel = new Panel();
+      panel.setLayout(new FlowLayout());
+      
+      cc_makeRoom = new Button("대화방개설");
+      cc_makeRoom.addActionListener(this);
+      panel.add(cc_makeRoom);
+      
+     
+      panel.add(cc_btEnter);
+      add("South", panel);
 
       // 4개의 Panel 객체를 사용하여 대화방 정보를 출력한다.
       Panel roompanel = new Panel(); // 3개의 패널을 담을 패널객체
@@ -66,10 +79,20 @@ public class ChatClient extends Frame implements ActionListener,KeyListener
       centerpanel.add(cc_tfDate);
 
       Panel southpanel = new Panel();
-      southpanel.setLayout(new FlowLayout());
-      southpanel.add(new Label("로그온 사용자"));
+      southpanel.setLayout(new BorderLayout());
+      
+      southpanel.add("West",new Label("로그온 사용자"));
+      
+      Panel lstpanel = new Panel();
+      lstpanel.setLayout(new BorderLayout());
       cc_lstMember = new List(10);
-      southpanel.add(cc_lstMember);
+     
+      lstpanel.add("West",cc_lstMember);
+      cc_lstRoom = new List(10);
+      lstpanel.add("East",cc_lstRoom);
+      southpanel.add("South",lstpanel);   
+      southpanel.add("East",new Label("대화방 목록"));
+      
 
       roompanel.add("North", northpanel);
       roompanel.add("Center", centerpanel);
@@ -133,12 +156,20 @@ public class ChatClient extends Frame implements ActionListener,KeyListener
       }else if(b.getLabel().equals("로그아웃")){
     	  if(msg_logon.equals("")) {
     		  MessageBox msgBox = new MessageBox(this, "로그온", "로그온을 먼저 하십시오.");
+    		  msgBox.show();
     	  }
     	  else {
     		  cc_thread.requestLogout(msg_logon);
     	  }
     	 
       // 로그아웃 처리 루틴
+      }else if(b.getLabel().equals("대화방 개설")) {
+    	  if(msg_logon.equals("")) {//로그온 안되어 있을 때
+    		  MessageBox msgBox = new MessageBox(this, "로그온", "로그온을 먼저 하십시오.");
+    		  msgBox.show();
+    	  }else {
+    		  cc_thread.requestMakeRoom(msg_logon);
+    	  }
       }
    }
 

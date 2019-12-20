@@ -33,6 +33,7 @@ public class ClientThread extends Thread
    private static final int REQ_QUITROOM = 1041;
    private static final int REQ_WHISPER = 1042;
    private static final int REQ_SENDFILE = 1043;
+   private static final int REQ_CREATEROOM = 1044;
    // 서버로부터 전송되는 메시지 코드
    private static final int YES_LOGON = 2001;
    private static final int NO_LOGON = 2002;
@@ -90,6 +91,7 @@ public class ClientThread extends Thread
 
                // 로그온 성공 메시지  PACKET : YES_LOGON|개설시각|ID1`ID2`ID3...
                case YES_LOGON:{
+            	   System.out.println("herezzzzz");
                   logonbox.dispose();
                   ct_client.cc_tfLogon.setEditable(false);
                   ct_client.cc_tfStatus.setText("로그온이 성공했습니다.");
@@ -295,6 +297,18 @@ public class ClientThread extends Thread
    public void release(){ };
 
    // Logon 패킷(REQ_LOGON|ID)을 생성하고 전송한다.
+   public void requestMakeRoom(String id) {	   
+	   try {
+		   ct_buffer.setLength(0);
+		   ct_buffer.append(REQ_CREATEROOM);
+		   ct_buffer.append(SEPARATOR);
+		   ct_buffer.append(id);
+		   send(ct_buffer.toString());
+	   }catch (IOException e) {
+		// TODO Auto-generated catch block
+		   e.printStackTrace();
+	   }
+   }
    public void requestLogon(String id) {
       try{
          logonbox = new MessageBox(ct_client, "로그온", "서버에 로그온 중입니다.");
@@ -323,16 +337,16 @@ public class ClientThread extends Thread
    }
    
    public void requestQuitRoom(String id) {
-	      try{
-	         ct_buffer.setLength(0);   // QuitRoom 패킷을 생성한다.
-	         ct_buffer.append(REQ_QUITROOM);
-	         ct_buffer.append(SEPARATOR);
-	         ct_buffer.append(id);
-	         send(ct_buffer.toString());   // QuitRoom 패킷을 전송한다.
-	      }catch(IOException e){
-	         System.out.println(e);
-	      }
+	  try{
+	     ct_buffer.setLength(0);   // QuitRoom 패킷을 생성한다.
+	     ct_buffer.append(REQ_QUITROOM);
+	     ct_buffer.append(SEPARATOR);
+	     ct_buffer.append(id);
+	     send(ct_buffer.toString());   // QuitRoom 패킷을 전송한다.
+	   }catch(IOException e){
+	     System.out.println(e);
 	   }
+   }
 
    // SendWords 패킷(REQ_SENDWORDS|ID|대화말)을 생성하고 전송한다.
    public void requestSendWords(String words) {

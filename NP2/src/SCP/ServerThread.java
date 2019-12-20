@@ -17,11 +17,15 @@ public class ServerThread extends Thread
    /* 대화방 참여자 저장 */
    private static Hashtable<String,ServerThread> roomHash; 
    private static Vector<String> roomVector;
+   
+   private static Hashtable<String,ServerThread> lstroomHash;
+   private static Vector<String> lstroomVector;
 
    private static int isOpenRoom = 0; // 대화방이 개설안됨(초기값)
 
    private static final String SEPARATOR = "|"; // 메시지간 구분자
    private static final String DELIMETER = "`"; // 소메시지간 구분자
+  
    private static Date starttime;  	// 로그온 시각
 
    public String st_ID; 			// ID 저장
@@ -36,6 +40,7 @@ public class ServerThread extends Thread
    private static final int REQ_QUITROOM = 1041;
    private static final int REQ_WHISPER = 1042;
    private static final int REQ_SENDFILE = 1043;
+   private static final int REQ_CREATEROOM = 1044;
    // 클라이언트에 전송하는 메시지 코드
    private static final int YES_LOGON = 2001;
    private static final int NO_LOGON = 2002;
@@ -64,6 +69,8 @@ public class ServerThread extends Thread
       logonVector = new Vector<String>(ChatServer.cs_maxclient); 
       roomHash = new Hashtable<String,ServerThread>(ChatServer.cs_maxclient);
       roomVector = new Vector<String>(ChatServer.cs_maxclient); 
+      lstroomHash = new Hashtable<String,ServerThread>(ChatServer.cs_maxclient);
+      lstroomVector = new Vector<String>(ChatServer.cs_maxclient);
    }
 
    public ServerThread(Socket sock){
@@ -80,6 +87,7 @@ public class ServerThread extends Thread
    public void run(){
       try{
          while(true){
+        	//System.out.println("here");
             String recvData = st_in.readUTF();
             StringTokenizer st = new StringTokenizer(recvData, SEPARATOR);
             int command = Integer.parseInt(st.nextToken());
